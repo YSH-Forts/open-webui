@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { marked } from 'marked';
 	import { replaceTokens, processResponseContent } from '$lib/utils';
 	import { user } from '$lib/stores';
@@ -11,17 +11,17 @@
 
 	const dispatch = createEventDispatcher();
 
-	export let id;
-	export let content;
-	export let model = null;
+	export let id: string;
+	export let content: string;
+	export let model: any = null;
 	export let save = false;
 
-	export let sourceIds = [];
+	export let sourceIds: string[] = [];
 
-	export let onSourceClick = () => {};
-	export let onTaskClick = () => {};
+	export let onSourceClick: Function = () => {};
+	export let onTaskClick: Function = () => {};
 
-	let tokens = [];
+	let tokens: any[] = [];
 
 	const options = {
 		throwOnError: false
@@ -30,10 +30,20 @@
 	marked.use(markedKatexExtension(options));
 	marked.use(markedExtension(options));
 
+	// 预处理 Markdown 内容，将 echarts 代码块转换为标准代码块
+	function preprocessECharts(content: string): string {
+		// 保持 ```echarts 代码块不变，确保标记为 echarts 语言
+		return content.replace(/```echarts\s+([\s\S]+?)```/g, (match: string, code: string) => {
+			return "```echarts\n" + code + "\n```";
+		});
+	}
+
 	$: (async () => {
 		if (content) {
+			// 预处理 echarts 代码块
+			const processedContent = preprocessECharts(content);
 			tokens = marked.lexer(
-				replaceTokens(processResponseContent(content), sourceIds, model?.name, $user?.name)
+				replaceTokens(processResponseContent(processedContent), sourceIds, model?.name, $user?.name)
 			);
 		}
 	})();

@@ -24,18 +24,62 @@
 	import ModelDeleteConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 
-	let modelUploadInputElement: HTMLInputElement;
-	let showModelDeleteConfirm = false;
+	interface OllamaModel {
+		id: string;
+		name: string;
+		size: number;
+		[key: string]: any;
+	}
+
+	interface PullModelResponse {
+		body: ReadableStream;
+	}
+
+	type PullModelResult = [Response | null, AbortController | null];
+
+	interface StreamData {
+		error?: string;
+		detail?: string;
+		status?: string;
+		digest?: string;
+		completed?: number;
+		total?: number;
+	}
+
+	interface ModelDownloadPool {
+		[key: string]: {
+			abortController?: AbortController;
+			reader?: ReadableStreamDefaultReader<string>;
+			pullProgress?: number;
+			digest?: string;
+			done?: boolean;
+		};
+	}
+
+	interface Config {
+		features: {
+			auth: boolean;
+			auth_trusted_header: boolean;
+			enable_api_key: boolean;
+			enable_signup: boolean;
+			enable_login_form: boolean;
+			enable_web_search?: boolean;
+			enable_google_drive_integration: boolean;
+			enable_direct_connections?: boolean;
+			[key: string]: any;
+		};
+		[key: string]: any;
+	}
 
 	let loading = true;
 
 	// Models
 	export let urlIdx: number | null = null;
 
-	let ollamaModels = [];
+	let ollamaModels: OllamaModel[] = [];
 
-	let updateModelId = null;
-	let updateProgress = null;
+	let updateModelId: string | null = null;
+	let updateProgress: number | null = null;
 	let showExperimentalOllama = false;
 
 	const MAX_PARALLEL_DOWNLOADS = 3;
@@ -46,33 +90,39 @@
 	let createModelLoading = false;
 	let createModelName = '';
 	let createModelObject = '';
-
 	let createModelDigest = '';
-	let createModelPullProgress = null;
+	let createModelPullProgress: number | null = null;
+	let createModelTag = '';
 
 	let digest = '';
-	let pullProgress = null;
+	let pullProgress: number | null = null;
 
-	let modelUploadMode = 'file';
-	let modelInputFile: File[] | null = null;
+	let modelUploadMode: 'file' | 'url' = 'file';
+	let modelInputFile: FileList | null = null;
 	let modelFileUrl = '';
 	let modelFileContent = `TEMPLATE """{{ .System }}\nUSER: {{ .Prompt }}\nASSISTANT: """\nPARAMETER num_ctx 4096\nPARAMETER stop "</s>"\nPARAMETER stop "USER:"\nPARAMETER stop "ASSISTANT:"`;
 	let modelFileDigest = '';
 
-	let uploadProgress = null;
+	let uploadProgress: number | null = null;
 	let uploadMessage = '';
 
 	let deleteModelTag = '';
+
+	let modelUploadInputElement: HTMLInputElement;
+	let showModelDeleteConfirm = false;
+
+	$: modelDownloadPool = $MODEL_DOWNLOAD_POOL as ModelDownloadPool;
+	$: configStore = $config as Config;
 
 	const updateModelsHandler = async () => {
 		for (const model of ollamaModels) {
 			console.log(model);
 
 			updateModelId = model.id;
-			const [res, controller] = await pullModel(localStorage.token, model.id, urlIdx).catch(
-				(error) => {
+			const [res, controller]: PullModelResult = await pullModel(localStorage.token, model.id, urlIdx).catch(
+				(error: Error | string) => {
 					toast.error(`${error}`);
-					return null;
+					return [null, null];
 				}
 			);
 
@@ -91,7 +141,7 @@
 
 						for (const line of lines) {
 							if (line !== '') {
-								let data = JSON.parse(line);
+								let data: StreamData = JSON.parse(line);
 
 								console.log(data);
 								if (data.error) {
@@ -104,7 +154,7 @@
 									if (data.digest) {
 										updateProgress = 0;
 										if (data.completed) {
-											updateProgress = Math.round((data.completed / data.total) * 1000) / 10;
+											updateProgress = Math.round((data.completed / data.total!) * 1000) / 10;
 										} else {
 											updateProgress = 100;
 										}
@@ -143,10 +193,10 @@
 			return;
 		}
 
-		const [res, controller] = await pullModel(localStorage.token, sanitizedModelTag, urlIdx).catch(
-			(error) => {
+		const [res, controller]: PullModelResult = await pullModel(localStorage.token, sanitizedModelTag, urlIdx).catch(
+			(error: Error | string) => {
 				toast.error(`${error}`);
-				return null;
+				return [null, null];
 			}
 		);
 
@@ -175,7 +225,7 @@
 
 					for (const line of lines) {
 						if (line !== '') {
-							let data = JSON.parse(line);
+							let data: StreamData = JSON.parse(line);
 							console.log(data);
 							if (data.error) {
 								throw data.error;
@@ -188,7 +238,7 @@
 								if (data.digest) {
 									let downloadProgress = 0;
 									if (data.completed) {
-										downloadProgress = Math.round((data.completed / data.total) * 1000) / 10;
+										downloadProgress = Math.round((data.completed / data.total!) * 1000) / 10;
 									} else {
 										downloadProgress = 100;
 									}
@@ -218,7 +268,7 @@
 				} catch (error) {
 					console.log(error);
 					if (typeof error !== 'string') {
-						error = error.message;
+						error = (error as Error).message;
 					}
 
 					toast.error(`${error}`);
@@ -443,6 +493,7 @@
 
 	const createModelHandler = async () => {
 		createModelLoading = true;
+		createModelTag = createModelName;
 
 		let modelObject = {};
 		// parse createModelObject
@@ -683,8 +734,7 @@
 									<div class="">
 										<div class="flex flex-row justify-between space-x-4 pr-2">
 											<div class=" flex-1">
-												<div
-													class="dark:bg-gray-600 bg-gray-500 text-xs font-medium text-gray-100 text-center p-0.5 leading-none rounded-full"
+												<div class="dark:bg-gray-600 bg-gray-500 text-xs font-medium text-gray-100 text-center p-0.5 leading-none rounded-full"
 													style="width: {Math.max(
 														15,
 														$MODEL_DOWNLOAD_POOL[model].pullProgress ?? 0

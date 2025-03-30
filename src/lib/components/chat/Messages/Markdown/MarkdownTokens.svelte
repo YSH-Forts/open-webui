@@ -17,7 +17,8 @@
 	import Collapsible from '$lib/components/common/Collapsible.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import ArrowDownTray from '$lib/components/icons/ArrowDownTray.svelte';
-	import Source from './Source.svelte';
+	import EChartsRenderer from '../EChartsRenderer.svelte';
+	import ChartRenderer from '../ChartRenderer.svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -81,7 +82,17 @@
 			<MarkdownInlineTokens id={`${id}-${tokenIdx}-h`} tokens={token.tokens} {onSourceClick} />
 		</svelte:element>
 	{:else if token.type === 'code'}
-		{#if token.raw.includes('```')}
+		{#if token.lang === 'echarts'}
+			<EChartsRenderer
+				id={`${id}-${tokenIdx}`}
+				options={token.text}
+			/>
+		{:else if token.lang === 'chart'}
+			<ChartRenderer
+				id={`${id}-${tokenIdx}`}
+				options={token.text}
+			/>
+		{:else if token.raw.includes('```')}
 			<CodeBlock
 				id={`${id}-${tokenIdx}`}
 				{token}
@@ -89,14 +100,14 @@
 				code={token?.text ?? ''}
 				{attributes}
 				{save}
-				onCode={(value) => {
-					dispatch('code', value);
+				on:code={(e) => {
+					dispatch('code', e.detail);
 				}}
-				onSave={(value) => {
+				on:save={(e) => {
 					dispatch('update', {
 						raw: token.raw,
 						oldContent: token.text,
-						newContent: value
+						newContent: e.detail
 					});
 				}}
 			/>
@@ -262,8 +273,6 @@
 			{@html html}
 		{:else if token.text.includes(`<iframe src="${WEBUI_BASE_URL}/api/v1/files/`)}
 			{@html `${token.text}`}
-		{:else if token.text.includes(`<source_id`)}
-			<Source {id} {token} onClick={onSourceClick} />
 		{:else}
 			{token.text}
 		{/if}

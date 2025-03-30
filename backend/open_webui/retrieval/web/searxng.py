@@ -40,10 +40,11 @@ def search_searxng(
     """
 
     # Default values for optional parameters are provided as empty strings or None when not specified.
-    language = kwargs.get("language", "en-US")
+    language = kwargs.get("language", "auto")
     safesearch = kwargs.get("safesearch", "1")
     time_range = kwargs.get("time_range", "")
-    categories = "".join(kwargs.get("categories", []))
+    categories = kwargs.get("categories", ["general","news"])
+    engines = kwargs.get("categories", ["bing"])
 
     params = {
         "q": query,
@@ -55,6 +56,9 @@ def search_searxng(
         "categories": categories,
         "theme": "simple",
         "image_proxy": 0,
+        "engines":engines,
+        "timeout":3,
+        'format': 'json'
     }
 
     # Legacy query format

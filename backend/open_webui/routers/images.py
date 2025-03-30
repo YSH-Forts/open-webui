@@ -25,7 +25,7 @@ from pydantic import BaseModel
 log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["IMAGES"])
 
-IMAGE_CACHE_DIR = CACHE_DIR / "image" / "generations"
+IMAGE_CACHE_DIR = Path(CACHE_DIR).joinpath("./image/generations/")
 IMAGE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -144,8 +144,6 @@ async def update_config(
     request.app.state.config.COMFYUI_BASE_URL = (
         form_data.comfyui.COMFYUI_BASE_URL.strip("/")
     )
-    request.app.state.config.COMFYUI_API_KEY = form_data.comfyui.COMFYUI_API_KEY
-
     request.app.state.config.COMFYUI_WORKFLOW = form_data.comfyui.COMFYUI_WORKFLOW
     request.app.state.config.COMFYUI_WORKFLOW_NODES = (
         form_data.comfyui.COMFYUI_WORKFLOW_NODES
@@ -205,17 +203,9 @@ async def verify_url(request: Request, user=Depends(get_admin_user)):
             request.app.state.config.ENABLE_IMAGE_GENERATION = False
             raise HTTPException(status_code=400, detail=ERROR_MESSAGES.INVALID_URL)
     elif request.app.state.config.IMAGE_GENERATION_ENGINE == "comfyui":
-
-        headers = None
-        if request.app.state.config.COMFYUI_API_KEY:
-            headers = {
-                "Authorization": f"Bearer {request.app.state.config.COMFYUI_API_KEY}"
-            }
-
         try:
             r = requests.get(
-                url=f"{request.app.state.config.COMFYUI_BASE_URL}/object_info",
-                headers=headers,
+                url=f"{request.app.state.config.COMFYUI_BASE_URL}/object_info"
             )
             r.raise_for_status()
             return True
@@ -361,7 +351,7 @@ def get_models(request: Request, user=Depends(get_verified_user)):
             if model_node_id:
                 model_list_key = None
 
-                log.info(workflow[model_node_id]["class_type"])
+                print(workflow[model_node_id]["class_type"])
                 for key in info[workflow[model_node_id]["class_type"]]["input"][
                     "required"
                 ]:
@@ -517,13 +507,7 @@ async def image_generations(
             images = []
 
             for image in res["data"]:
-                if "url" in image:
-                    image_data, content_type = load_url_image_data(
-                        image["url"], headers
-                    )
-                else:
-                    image_data, content_type = load_b64_image_data(image["b64_json"])
-
+                image_data, content_type = load_b64_image_data(image["b64_json"])
                 url = upload_image(request, data, image_data, content_type, user)
                 images.append({"url": url})
             return images

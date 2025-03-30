@@ -24,6 +24,12 @@
 
 	const i18n = getContext('i18n');
 
+	// Add debugging log
+	onMount(() => {
+		console.log('Messages component mounted with chatId:', chatId);
+		console.log('History object:', history);
+	});
+
 	export let className = 'h-full flex pt-8';
 
 	export let chatId = '';
@@ -32,7 +38,6 @@
 	export let prompt;
 	export let history = {};
 	export let selectedModels;
-	export let atSelectedModel;
 
 	let messages = [];
 
@@ -228,8 +233,7 @@
 					role: 'user',
 					content: userPrompt,
 					...(history.messages[messageId].files && { files: history.messages[messageId].files }),
-					models: selectedModels,
-					timestamp: Math.floor(Date.now() / 1000) // Unix epoch
+					models: selectedModels
 				};
 
 				let messageParentId = history.messages[messageId].parentId;
@@ -351,7 +355,6 @@
 	{#if Object.keys(history?.messages ?? {}).length == 0}
 		<ChatPlaceholder
 			modelIds={selectedModels}
-			{atSelectedModel}
 			submitPrompt={async (p) => {
 				let text = p;
 
@@ -402,28 +405,28 @@
 					{/if}
 
 					{#each messages as message, messageIdx (message.id)}
-						<Message
-							{chatId}
-							bind:history
-							messageId={message.id}
-							idx={messageIdx}
-							{user}
-							{showPreviousMessage}
-							{showNextMessage}
-							{updateChat}
-							{editMessage}
-							{deleteMessage}
-							{rateMessage}
-							{actionMessage}
-							{saveMessage}
-							{submitMessage}
-							{regenerateResponse}
-							{continueResponse}
-							{mergeResponses}
-							{addMessages}
-							{triggerScroll}
-							{readOnly}
-						/>
+							<Message
+								{chatId}
+								bind:history
+								messageId={message.id}
+								idx={messageIdx}
+								{user}
+								{showPreviousMessage}
+								{showNextMessage}
+								{updateChat}
+								{editMessage}
+								{deleteMessage}
+								{rateMessage}
+								{actionMessage}
+								{saveMessage}
+								{submitMessage}
+								{regenerateResponse}
+								{continueResponse}
+								{mergeResponses}
+								{addMessages}
+								{triggerScroll}
+								{readOnly}
+							/>
 					{/each}
 				</div>
 				<div class="pb-12" />
